@@ -61,6 +61,7 @@ async function load(source) {
     options: {slots = false, ...options} = {
       allowComments: true,
     },
+    processTokens = undefined,
     nextjsExports = ['metadata', 'revalidate'],
     appDir = false,
   } = this.getOptions() || {};
@@ -70,7 +71,8 @@ async function load(source) {
 
   const schemaDir = path.resolve(dir, schemaPath || DEFAULT_SCHEMA_PATH);
   const tokens = tokenizer.tokenize(source);
-  const ast = Markdoc.parse(tokens, parseOptions);
+  const processed = processTokens ? processTokens(tokens) : tokens;
+  const ast = Markdoc.parse(processed, parseOptions);
 
   // Grabs the path of the file relative to the `/{app,pages}` directory
   // to pass into the app props later.
@@ -111,6 +113,7 @@ async function load(source) {
         ${await importAtRuntime('tags')}
         ${await importAtRuntime('nodes')}
         ${await importAtRuntime('functions')}
+        ${await importAtRuntime('processtokens')}
         const schema = {
           tags: defaultObject(tags),
           nodes: defaultObject(nodes),
@@ -146,6 +149,7 @@ import {getSchema, defaultObject} from '${normalize(
  * This enables typescript/ESnext support
  */
 ${schemaCode}
+const processTokens = defaultObject(processtokens);
 
 const tokenizer = new Markdoc.Tokenizer(${
     options ? JSON.stringify(options) : ''
@@ -157,8 +161,9 @@ const tokenizer = new Markdoc.Tokenizer(${
 const source = ${JSON.stringify(source)};
 const filepath = ${JSON.stringify(filepath)};
 const tokens = tokenizer.tokenize(source);
+const processed = processTokens ? processTokens(tokens) : tokens;
 const parseOptions = ${JSON.stringify(parseOptions)};
-const ast = Markdoc.parse(tokens, parseOptions);
+const ast = Markdoc.parse(processed, parseOptions);
 
 /**
  * Like the AST, frontmatter won't change at runtime, so it is loaded at file root.
@@ -176,7 +181,8 @@ async function getMarkdocData(context = {}) {
   // Ensure Node.transformChildren is available
   Object.keys(partials).forEach((key) => {
     const tokens = tokenizer.tokenize(partials[key]);
-    partials[key] = Markdoc.parse(tokens, parseOptions);
+    const processed = processTokens ? processTokens(tokens) : tokens;
+    partials[key] = Markdoc.parse(processed, parseOptions);
   });
 
   const cfg = {
